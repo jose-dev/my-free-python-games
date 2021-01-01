@@ -10,34 +10,66 @@ Exercises
 """
 
 import os
+import datetime
 from turtle import *
 from random import randrange
 from freegames import square, vector
 
 poops = []
-food = vector(0, 0)
+FOOD_RENEW_SECS = 7
+FOOD_LOC = vector(0, 0)
 snake = [vector(10, 0)]
 aim = vector(0, -10)
+
+
+def now():
+    return datetime.datetime.utcnow()
+
+
+def inside(head):
+    "Return True if head inside boundaries."
+    return -200 < head.x < 190 and -200 < head.y < 190
+
+
+class Food(object):
+    def __init__(self, loc=FOOD_LOC, renew_secs=FOOD_RENEW_SECS):
+        self.loc = loc
+        self.renew_secs = renew_secs
+        self.started = now()
+
+    def update(self, loc):
+        self.loc = loc
+        self.started = now()
+
+    def is_expired(self):
+        return (now() - self.started).total_seconds() >= self.renew_secs
+
+
+
+food = Food(FOOD_LOC, FOOD_RENEW_SECS)
+
+
+def get_new_food():
+    while True:
+        x = randrange(-15, 15) * 10
+        y = randrange(-15, 15) * 10
+        loc = vector(x, y)
+        if inside(loc) and loc not in poops and loc not in snake:
+            food.update(loc)
+            break
+
+
+
+
 
 def change(x, y):
     "Change snake direction."
     aim.x = x
     aim.y = y
 
-def inside(head):
-    "Return True if head inside boundaries."
-    return -200 < head.x < 190 and -200 < head.y < 190
-
 def say(msg, game_over=False):
     game_over = ', game over' if game_over else ''
     os.system("say '{}{}' &".format(msg, game_over))
-
-def get_new_food():
-    while True:
-        food.x = randrange(-15, 15) * 10
-        food.y = randrange(-15, 15) * 10
-        if inside(food) and food not in poops and food not in snake:
-            break
 
 def move():
     "Move snake forward one segment."
@@ -57,12 +89,10 @@ def move():
 
     snake.append(head)
 
-    if head == food:
+    if head == food.loc:
         say("yummy")
         print('Snake:', len(snake))
         get_new_food()
-        #food.x = randrange(-15, 15) * 10
-        #food.y = randrange(-15, 15) * 10
 
         # do poo
         poo = snake[0].copy()
@@ -70,6 +100,11 @@ def move():
 
     else:
         snake.pop(0)
+        if food.is_expired():
+            say('too slow')
+            get_new_food()
+            if len(snake) > 1:
+                snake.pop(0)
 
     clear()
 
@@ -78,7 +113,7 @@ def move():
     for body in poops:
         square(body.x, body.y, 9, 'brown')
 
-    square(food.x, food.y, 9, 'green')
+    square(food.loc.x, food.loc.y, 9, 'green')
     update()
     ontimer(move, 100)
 

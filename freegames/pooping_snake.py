@@ -15,10 +15,10 @@ from turtle import *
 from random import randrange
 from freegames import square, vector
 
-poops = []
+#poops = []
 FOOD_RENEW_SECS = 7
 FOOD_LOC = vector(0, 0)
-snake = [vector(10, 0)]
+#snake = [vector(10, 0)]
 aim = vector(0, -10)
 
 
@@ -26,15 +26,12 @@ def now():
     return datetime.datetime.utcnow()
 
 
-def inside(head):
-    "Return True if head inside boundaries."
-    return -200 < head.x < 190 and -200 < head.y < 190
 
 
-class Food(object):
-    def __init__(self, loc=FOOD_LOC, renew_secs=FOOD_RENEW_SECS):
+class Item(object):
+    def __init__(self, loc, expiry_secs):
         self.loc = loc
-        self.renew_secs = renew_secs
+        self.expiry_secs = expiry_secs
         self.started = now()
 
     def update(self, loc):
@@ -42,23 +39,59 @@ class Food(object):
         self.started = now()
 
     def is_expired(self):
-        return (now() - self.started).total_seconds() >= self.renew_secs
+        return (now() - self.started).total_seconds() >= self.expiry_secs
+
+
+class Food(Item):
+    def __init__(self, loc=FOOD_LOC, expiry_secs=FOOD_RENEW_SECS):
+        super(Food, self).__init__(loc, expiry_secs)
+
+
+class Snake(object):
+    def __init__(self):
+        self.body = [vector(10, 0)]
+
+    def head(self):
+        return self.body[-1].copy()
+
+    def tail(self):
+        return self.body[0].copy()
+
+    def length(self):
+        return len(self.body)
+
+    def append(self, v):
+        self.body.append(v)
+
+    def pop(self):
+        self.body.pop(0)
+
+
+class PoopingSnakeController(object):
+    def __init__(self):
+        self.food = Food()
+        self.snake = Snake()
+        self.poops = []
+
+    def get_new_food(self):
+        while True:
+            x = randrange(-15, 15) * 10
+            y = randrange(-15, 15) * 10
+            loc = vector(x, y)
+            if self.inside(loc) and loc not in self.poops and loc not in self.snake.body:
+                self.food.update(loc)
+                break
+
+    def ate_food(self):
+        return self.snake.head() == self.food.loc
+
+    def inside(self, loc):
+        "Return True if head inside boundaries."
+        return -200 < loc.x < 190 and -200 < loc.y < 190
 
 
 
-food = Food(FOOD_LOC, FOOD_RENEW_SECS)
-
-
-def get_new_food():
-    while True:
-        x = randrange(-15, 15) * 10
-        y = randrange(-15, 15) * 10
-        loc = vector(x, y)
-        if inside(loc) and loc not in poops and loc not in snake:
-            food.update(loc)
-            break
-
-
+ctl = PoopingSnakeController()
 
 
 
@@ -73,47 +106,47 @@ def say(msg, game_over=False):
 
 def move():
     "Move snake forward one segment."
-    head = snake[-1].copy()
+    head = ctl.snake.head()
     head.move(aim)
 
-    if not inside(head) or head in snake or head in poops:
+    if not ctl.inside(head) or head in ctl.snake.body or head in ctl.poops:
         square(head.x, head.y, 9, 'red')
         update()
-        if head in poops:
+        if head in ctl.poops:
             say('Yuk, you ate poo', game_over=True)
-        elif head in snake:
+        elif head in ctl.snake.body:
             say("do not be a cannibal", game_over=True)
-        elif not inside(head):
+        elif not ctl.inside(head):
             say("you went too far", game_over=True)
         return
 
-    snake.append(head)
+    ctl.snake.append(head)
 
-    if head == food.loc:
+    if ctl.ate_food():
         say("yummy")
-        print('Snake:', len(snake))
-        get_new_food()
+        print('Snake:', ctl.snake.length())
+        ctl.get_new_food()
 
         # do poo
-        poo = snake[0].copy()
-        poops.append(vector(poo.x, poo.y))
+        poo = ctl.snake.tail()
+        ctl.poops.append(vector(poo.x, poo.y))
 
     else:
-        snake.pop(0)
-        if food.is_expired():
+        ctl.snake.pop()
+        if ctl.food.is_expired():
             say('too slow')
-            get_new_food()
-            if len(snake) > 1:
-                snake.pop(0)
+            ctl.get_new_food()
+            if ctl.snake.length() > 1:
+                ctl.snake.pop(0)
 
     clear()
 
-    for body in snake:
+    for body in ctl.snake.body:
         square(body.x, body.y, 9, 'black')
-    for body in poops:
+    for body in ctl.poops:
         square(body.x, body.y, 9, 'brown')
 
-    square(food.loc.x, food.loc.y, 9, 'green')
+    square(ctl.food.loc.x, ctl.food.loc.y, 9, 'green')
     update()
     ontimer(move, 100)
 

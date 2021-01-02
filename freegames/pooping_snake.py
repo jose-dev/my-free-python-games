@@ -10,6 +10,7 @@ Exercises
 """
 
 import os
+import random
 import datetime
 from turtle import *
 from random import randrange
@@ -26,29 +27,27 @@ def now():
     return datetime.datetime.utcnow()
 
 
-
-
-class Item(object):
-    def __init__(self, loc, expiry_secs):
+class Food(object):
+    def __init__(self, loc=FOOD_LOC, expiry_secs=FOOD_RENEW_SECS):
         self.loc = loc
         self.expiry_secs = expiry_secs
         self.started = now()
+        self.color = 'green'
 
     def update(self, loc):
         self.loc = loc
         self.started = now()
+        self.set_color()
 
     def is_expired(self):
         return (now() - self.started).total_seconds() >= self.expiry_secs
 
-
-class Food(Item):
-    def __init__(self, loc=FOOD_LOC, expiry_secs=FOOD_RENEW_SECS):
-        super(Food, self).__init__(loc, expiry_secs)
-        self.color = 'green'
-
     def draw(self):
         square(self.loc.x, self.loc.y, 9, self.color)
+
+    def set_color(self):
+        color = random.choices(population=['green', 'cyan', 'yellow'], weights=[0.6, 0.2, 0.2], k=1)[0]
+        self.color = color
 
 
 class Poops(object):
@@ -95,12 +94,12 @@ class Snake(object):
             square(body.x, body.y, 9, self.color)
 
 
-
 class PoopingSnakeController(object):
     def __init__(self):
         self.food = Food()
         self.snake = Snake()
         self.poops = Poops()
+        self.set_speed()
 
     def get_new_food(self):
         while True:
@@ -111,8 +110,26 @@ class PoopingSnakeController(object):
                 self.food.update(loc)
                 break
 
+    def set_speed(self):
+        mode = self.food_energy()
+        speed = 100
+        if mode == 'fast':
+            speed = 70
+        elif mode == 'slow':
+            speed = 140
+        self.speed = speed
+
     def ate_food(self):
-        return self.snake.head() == self.food.loc
+        it_did = self.snake.head() == self.food.loc
+        if it_did:
+            self.set_speed()
+        return it_did
+
+    def food_energy(self):
+        energy = {'green': 'default',
+                  'yellow': 'slow',
+                  'cyan': 'fast'}
+        return energy.get(self.food.color, 'default')
 
     def inside(self, loc):
         "Return True if head inside boundaries."
@@ -181,7 +198,7 @@ def move():
     ctl.food.draw()
 
     update()
-    ontimer(move, 100)
+    ontimer(move, ctl.speed)
 
 setup(420, 420, 370, 0)
 hideturtle()

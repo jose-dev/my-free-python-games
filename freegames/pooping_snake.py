@@ -45,11 +45,29 @@ class Item(object):
 class Food(Item):
     def __init__(self, loc=FOOD_LOC, expiry_secs=FOOD_RENEW_SECS):
         super(Food, self).__init__(loc, expiry_secs)
+        self.color = 'green'
+
+    def draw(self):
+        square(self.loc.x, self.loc.y, 9, self.color)
+
+
+class Poops(object):
+    def __init__(self):
+        self.items = []
+        self.color = 'brown'
+
+    def add(self, loc):
+        self.items.append(loc)
+
+    def draw(self):
+        for body in self.items:
+            square(body.x, body.y, 9, self.color)
 
 
 class Snake(object):
     def __init__(self):
         self.body = [vector(10, 0)]
+        self.color = 'black'
 
     def head(self):
         return self.body[-1].copy()
@@ -60,25 +78,36 @@ class Snake(object):
     def length(self):
         return len(self.body)
 
-    def append(self, v):
+    def grow(self, v):
         self.body.append(v)
 
-    def pop(self):
+    def shrink(self):
         self.body.pop(0)
+
+    def move(self):
+        self.shrink()
+
+    def poop(self):
+        self.shrink()
+
+    def draw(self):
+        for body in self.body:
+            square(body.x, body.y, 9, self.color)
+
 
 
 class PoopingSnakeController(object):
     def __init__(self):
         self.food = Food()
         self.snake = Snake()
-        self.poops = []
+        self.poops = Poops()
 
     def get_new_food(self):
         while True:
             x = randrange(-15, 15) * 10
             y = randrange(-15, 15) * 10
             loc = vector(x, y)
-            if self.inside(loc) and loc not in self.poops and loc not in self.snake.body:
+            if self.inside(loc) and loc not in self.poops.items and loc not in self.snake.body:
                 self.food.update(loc)
                 break
 
@@ -88,6 +117,17 @@ class PoopingSnakeController(object):
     def inside(self, loc):
         "Return True if head inside boundaries."
         return -200 < loc.x < 190 and -200 < loc.y < 190
+
+    def is_invalid_move(self, loc):
+        return not self.inside(loc) or loc in self.snake.body or loc in self.poops.items
+
+    def invalid_move_message(self, loc):
+        if loc in self.poops.items:
+            return 'Yuk, you ate poo'
+        elif loc in self.snake.body:
+            return "do not be a cannibal"
+        elif not self.inside(loc):
+            return "you went too far"
 
 
 
@@ -109,18 +149,13 @@ def move():
     head = ctl.snake.head()
     head.move(aim)
 
-    if not ctl.inside(head) or head in ctl.snake.body or head in ctl.poops:
+    if ctl.is_invalid_move(head):
         square(head.x, head.y, 9, 'red')
         update()
-        if head in ctl.poops:
-            say('Yuk, you ate poo', game_over=True)
-        elif head in ctl.snake.body:
-            say("do not be a cannibal", game_over=True)
-        elif not ctl.inside(head):
-            say("you went too far", game_over=True)
+        say(ctl.invalid_move_message(head), game_over=True)
         return
 
-    ctl.snake.append(head)
+    ctl.snake.grow(head)
 
     if ctl.ate_food():
         say("yummy")
@@ -128,25 +163,23 @@ def move():
         ctl.get_new_food()
 
         # do poo
-        poo = ctl.snake.tail()
-        ctl.poops.append(vector(poo.x, poo.y))
+        ctl.poops.add(ctl.snake.tail())
 
     else:
-        ctl.snake.pop()
+        ctl.snake.move()
         if ctl.food.is_expired():
             say('too slow')
             ctl.get_new_food()
             if ctl.snake.length() > 1:
-                ctl.snake.pop(0)
+                ctl.poops.add(ctl.snake.tail())
+                ctl.snake.shrink()
 
     clear()
 
-    for body in ctl.snake.body:
-        square(body.x, body.y, 9, 'black')
-    for body in ctl.poops:
-        square(body.x, body.y, 9, 'brown')
+    ctl.snake.draw()
+    ctl.poops.draw()
+    ctl.food.draw()
 
-    square(ctl.food.loc.x, ctl.food.loc.y, 9, 'green')
     update()
     ontimer(move, 100)
 
